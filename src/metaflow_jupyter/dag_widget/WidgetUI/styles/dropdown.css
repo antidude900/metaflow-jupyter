@@ -1,0 +1,118 @@
+.dag-dropdown-container {
+	background: white;
+	border: 1px solid #cbd5e1;
+	border-radius: 12px;
+	box-shadow:
+		0 10px 15px -3px rgba(0, 0, 0, 0.1),
+		0 4px 6px -2px rgba(0, 0, 0, 0.05);
+	padding: 4px;
+	display: flex;
+	flex-direction: column;
+	box-sizing: border-box;
+	overflow: hidden;
+}
+
+.dag-dropdown-title {
+	padding: 8px 30px 4px 12px;
+	font-size: 13px;
+	font-weight: 700;
+	color: #1e293b;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	border-bottom: 1px solid #f1f5f9;
+}
+
+.dag-dropdown-close {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	width: 18px;
+	height: 18px;
+	border: none;
+	background: #f1f5f9;
+	color: #64748b;
+	border-radius: 50%;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 14px;
+	padding: 0;
+	z-index: 10;
+	line-height: 1;
+}
+
+.dag-dropdown-close:hover {
+	background: #e2e8f0;
+	color: red;
+}
+
+.dag-dropdown-list {
+	margin-top: 4px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 4px;
+	flex: 1;
+	min-height: 0;
+}
+
+.dag-dropdown-list {
+	scrollbar-width: thin;
+	scrollbar-color: #cbd5e1 transparent;
+}
+
+.dag-dropdown-list::-webkit-scrollbar {
+	width: 4px;
+}
+
+.dag-dropdown-list::-webkit-scrollbar-track {
+	background: transparent;
+}
+.dag-dropdown-list::-webkit-scrollbar-thumb {
+	background: #cbd5e1; /* Subtle slate */
+	border-radius: 10px;
+}
+.dag-dropdown-list::-webkit-scrollbar-thumb:hover {
+	background: #94a3b8; /* Slightly darker on hover */
+}
+
+.dag-task-item {
+	display: block;
+	padding: 8px 12px;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: #334155;
+	flex-shrink: 0; /* Prevent shrinking when scrolling */
+}
+
+.dag-task-item.status-completed {
+	background: #dcfce7;
+	color: green;
+}
+.dag-task-item.status-failed {
+	background: #fee2e2;
+	color: red;
+}
+.dag-task-item.status-running {
+	background: #eff6ff;
+	color: blue;
+}
+.dag-task-item.status-pending {
+	background: #f1f5f9;
+	color: gray;
+}
+
+.dag-dropdown-empty {
+	padding: 10px 12px;
+	font-size: 12px;
+	font-style: italic;
+	color: #94a3b8;
+	text-align: center;
+}
