@@ -5,7 +5,7 @@ function renderForeachDropdown(node, pos, { nodeWidth, model }) {
 
     const itemHeight = 36;
     const padding = 48;
-    const totalHeight = (tasks.length * itemHeight) + padding;
+    const totalHeight = (tasks.length > 0 ? tasks.length * itemHeight : itemHeight) + padding;
     const actualHeight = Math.min(totalHeight, maxDropdownHeight);
 
     const top = pos.y - actualHeight / 2;
@@ -42,10 +42,15 @@ function renderForeachDropdown(node, pos, { nodeWidth, model }) {
 
     const listContainer = document.createElement("div");
     listContainer.classList.add("dag-dropdown-list");
-    if (tasks.length === 0) {
+    if (node.foreach.total === -1) {
         const empty = document.createElement("div");
         empty.classList.add("dag-dropdown-empty");
-        empty.textContent = "Dynamic items — available in Live View";
+        empty.textContent = node.status ? "Items Loading..." : "Items available in Live View";
+        listContainer.appendChild(empty);
+    } else if (node.foreach.total === 0) {
+        const empty = document.createElement("div");
+        empty.classList.add("dag-dropdown-empty");
+        empty.textContent = "No Items";
         listContainer.appendChild(empty);
     } else {
         tasks.forEach((task) => {

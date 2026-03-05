@@ -39,7 +39,7 @@ def extract_graph(flow_cls):
     nodes = [
         {"id": nid, "type": calibrate[nid], "row": rows[nid], **({
             "foreach": {
-                "total": len(foreach_child[nid]) if foreach_child[nid] else 0,
+                "total": len(foreach_child[nid]) if foreach_child[nid] is not None else -1,
                 "finished": 0,
                 "tasks": [{"label": l, "status": "pending"} for l in foreach_child[nid]] if foreach_child[nid] else [],
             }
