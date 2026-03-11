@@ -1,0 +1,42 @@
+/* Main layout and variables */
+
+* {
+	font-family: sans-serif;
+}
+
+.dag-widget-el {
+	display: flex;
+	justify-content: center;
+	width: 100%;
+	height: auto;
+	padding: 10px;
+}
+
+.dag-widget-container {
+	position: relative;
+	overflow: auto;
+	max-width: 100%;
+	max-height: 750px;
+	width: auto;
+	margin: 0 auto;
+	border: 1px solid gray;
+	border-radius: 12px;
+	background: gray-500;
+	padding: 20px 20px 10px 20px;
+	box-sizing: border-box;
+}
+
+.dag-widget-svg {
+	display: block;
+}
+
+.dag-loading {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	padding: 4px 12px;
+	font-family: sans-serif;
+	color: black;
+	font-weight: 500;
+	font-size: 15px;
+}
