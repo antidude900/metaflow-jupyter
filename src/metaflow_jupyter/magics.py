@@ -7,79 +7,63 @@ import sys
 
 @magics_class
 class MetaflowMagics(Magics):
+    def _extract_args(self, line, is_step=False):
+        """
+        Extract target (flow name and step(if is_step)) and tag from magic line
+        """
+        args = line.strip().split()
+        if not args:
+            return "MyFlow", "default"
+        
+        target = args[0]
+        tag = args[1] if len(args) > 1 else "default"
+
+        if target == "_":
+            return "MyFlow", tag
+            
+        if is_step and "." not in target:
+            return f"MyFlow.{target}", tag
+            
+        return target, tag
+
     @cell_magic
     def mf_step(self, line, cell):
         """
-        %%mf_step <FlowName>.<StepName> [tag] [--join]
+        %%mf_step [.Step or Flow.Step] [tag] [--join]
         """
-        args = line.strip().split()
-        if not args or "." not in args[0]:
-            raise ValueError("Explicit naming required: %%mf_step <FlowName>.<StepName> [tag] [--join]")
+        target, tag = self._extract_args(line, is_step=True)
+        is_join = "--join" in line.lower()
         
-        target = args[0]
-        extra_args = args[1:]
-        
-        # Check if '--join' is present in any of the extra arguments
-        is_join = "--join" in [a.lower() for a in extra_args]
-        
-        # Any argument that is NOT the word 'join' is treated as our tag
-        remaining_args = [a for a in extra_args if a.lower() != "--join"]
-        tag = remaining_args[0] if remaining_args else "default"
-        
-        if tag == "default":
-             # We only log for 'default' to stay consistent with other magics behavior
-             pass 
-
         flow_name, step_name = target.split(".", 1)
         registry.add_step(flow_name.strip(), step_name.strip(), tag, cell, is_join=is_join)
 
     @cell_magic
     def mf_global(self, line, cell):
         """
-        %%mf_global <FlowName> [tag]
+        %%mf_global [Flow or _] [tag]
         """
-        args = line.strip().split()
-        if not args:
-            raise ValueError("Flow name required: %%mf_global <FlowName> [tag]")
-            
-        flow_name = args[0]
-        tag = args[1] if len(args) > 1 else "default"
-            
-        registry.set_global(flow_name, tag, cell)
+        flow, tag = self._extract_args(line)
+        registry.set_global(flow, tag, cell)
 
     @cell_magic
     def mf_import(self, line, cell):
         """
-        %%mf_import <FlowName> [tag]
+        %%mf_import [Flow or _] [tag]
         """
-        args = line.strip().split()
-        if not args:
-            raise ValueError("Flow name required: %%mf_import <FlowName> [tag]")
-        
-        flow_name = args[0]
-        tag = args[1] if len(args) > 1 else "default"
-            
-        registry.set_import(flow_name, tag, cell)
+        flow, tag = self._extract_args(line)
+        registry.set_import(flow, tag, cell)
 
     @cell_magic
     def mf_decorator(self, line, cell):
         """
-        %%mf_decorator <FlowName> or <FlowName>.<StepName> [tag]
+        %%mf_decorator [.Step or Flow.Step or Flow or _] [tag]
         """
-        args = line.strip().split()
-        if not args:
-            raise ValueError("Target required: %%mf_decorator <FlowName>[.<StepName>] [tag]")
-            
-        target = args[0]
-        tag = args[1] if len(args) > 1 else "default"
-
-        # Extract all the decorators and check if all are valid or not(starts with @)
+        target, tag = self._extract_args(line)
         decorators = [l.strip() for l in cell.split("\n") if l.strip()]
         for d in decorators:
             if not d.startswith("@"):
-                raise ValueError(f"Invalid decorator syntax: '{d}'. Every line must start with '@'.")
+                raise ValueError(f"Invalid decorator: '{d}'. Must start with '@'.")
         
-        # if the target has a dot, it means it's a step decorator else it's a flow decorator
         if "." in target:
             flow_name, step_name = target.split(".", 1)
             registry.set_step_decorator(flow_name.strip(), step_name.strip(), decorators, tag)
@@ -89,26 +73,23 @@ class MetaflowMagics(Magics):
     @cell_magic
     def mf_local(self, line, cell):
         """
-        %%mf_local <FlowName> [tag]
+        %%mf_local [Flow or _] [tag]
         """
-        args = line.strip().split()
-        if not args:
-            raise ValueError("Flow name required: %%mf_local <FlowName> [tag]")
-            
-        flow_name = args[0]
-        tag = args[1] if len(args) > 1 else "default"
-            
-        registry.set_local(flow_name, tag, cell)
+        flow, tag = self._extract_args(line)
+        registry.set_local(flow, tag, cell)
 
     @line_magic
     def mf_clear(self, line):
-        """%mf_clear <FlowName> or %mf_clear --all"""
+        """
+        %mf_clear [FlowName] or %mf_clear --all
+        """
         arg = line.strip()
         if not arg:
-            print("Flow name or flag '--all' required: %mf_clear <FlowName> or %mf_clear --all")
+            flow_name = "MyFlow"
+            registry.clear(flow_name)
+            print("Metaflow Registry: Cleared MyFlow.")
             return
             
-        # If the arg is flag '--all', we clear registry of all flows else we only clear registry of the flow name passed
         if "--all" in arg:
             registry.clear()
             print("Metaflow Registry: Cleared all flows.")
@@ -120,13 +101,16 @@ class MetaflowMagics(Magics):
     @line_magic
     def mf_run(self, line):
         """
-        %mf_run <FlowName> [--export]
+        %mf_run [FlowName] [--export]
         """
         args = line.strip().split()
-        if not args:
-            raise ValueError("Flow name required: %mf_run <FlowName> [--export]")
         
-        flow_name = args[0]
+        # Resolve flow name (defaulting to MyFlow if first arg is empty or a flag)
+        if not args or args[0].startswith("--"):
+            flow_name = "MyFlow"
+        else:
+            flow_name = args[0]
+
         export = "--export" in [a.lower() for a in args]
         
         # convert the content of cell magics to a python script and run the script using Metaflow Runner
