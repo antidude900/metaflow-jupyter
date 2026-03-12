@@ -10,19 +10,28 @@ class MetaflowMagics(Magics):
     @cell_magic
     def mf_step(self, line, cell):
         """
-        %%mf_step <FlowName>.<StepName> [join]
+        %%mf_step <FlowName>.<StepName> [tag] [join]
         """
         args = line.strip().split()
         if not args or "." not in args[0]:
-            raise ValueError("Explicit naming required: %%mf_step <FlowName>.<StepName> [join]")
+            raise ValueError("Explicit naming required: %%mf_step <FlowName>.<StepName> [tag] [join]")
         
-        #the first argument has the name of the step of the specified Flow(FlowName.StepName)
-        #and there maybe a second argument which has a flag to make the step function's parameter include 'inputs' 
         target = args[0]
-        is_join = "join" in [arg.lower() for arg in args[1:]]
+        extra_args = args[1:]
         
+        # Check if 'join' is present in any of the extra arguments
+        is_join = "join" in [a.lower() for a in extra_args]
+        
+        # Any argument that is NOT the word 'join' is treated as our tag
+        remaining_args = [a for a in extra_args if a.lower() != "join"]
+        tag = remaining_args[0] if remaining_args else "default"
+        
+        if tag == "default":
+             # We only log for 'default' to stay consistent with other magics behavior
+             pass 
+
         flow_name, step_name = target.split(".", 1)
-        registry.add_step(flow_name.strip(), step_name.strip(), cell, is_join=is_join)
+        registry.add_step(flow_name.strip(), step_name.strip(), tag, cell, is_join=is_join)
 
     @cell_magic
     def mf_global(self, line, cell):

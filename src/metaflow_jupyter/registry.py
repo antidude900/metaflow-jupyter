@@ -44,9 +44,11 @@ class FlowRegistry:
             self.flows[flow_name].step_decorators[step_name] = {}
         self.flows[flow_name].step_decorators[step_name][tag] = decorators
 
-    def add_step(self, flow_name, step_name, code, is_join=False):
-        # flow_registry -> flow_name -> step_name -> (code, is_join)
-        self.flows[flow_name].steps[step_name] = (code, is_join)
+    def add_step(self, flow_name, step_name, tag, code, is_join=False):
+        # flow_registry -> flow_name -> step_name -> tag -> (code, is_join)
+        if step_name not in self.flows[flow_name].steps:
+            self.flows[flow_name].steps[step_name] = {}
+        self.flows[flow_name].steps[step_name][tag] = (code, is_join)
 
     def clear(self, flow_name=None):
         """
@@ -72,17 +74,33 @@ class FlowRegistry:
         
         # Put Import of Decorators to Metaflow Base Imports
 
-        # tag_grouped_decorators = List(List(str))
-        tag_grouped_decorators = list(flow.flow_decorators.values()) 
-        for step_tags in flow.step_decorators.values():
-            tag_grouped_decorators.extend(step_tags.values())
+        # tag_grouped_decorators = Tags[Decorators]
+        tag_grouped_decorators = list(flow.flow_decorators.values())
+        # steps_grouped_decorators = Steps[Tags[Decorators]] 
+        for steps_grouped_decorators in flow.step_decorators.values():
+            tag_grouped_decorators.extend(steps_grouped_decorators.values())
 
         for decorators in tag_grouped_decorators:
             for decorator in decorators:
-                #checking if each decorator starts with @ and if yes, we add it to mf_imports
+                # checking if each decorator starts with @ and if yes, we add it to mf_imports
                 match = re.match(r"@([\w]+)", decorator.strip())
                 if match:
                     mf_imports.add(match.group(1))
+
+        # 2. Scan Local Code for Parameter and IncludeFile using AST
+        for code in flow.local_code.values():
+            if not code.strip():
+                continue
+            try:
+                tree = ast.parse(code)
+                for node in ast.walk(tree):
+                    # We look for calls like Parameter() or IncludeFile()
+                    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+                        if node.func.id in {"Parameter", "IncludeFile"}:
+                            # If they exists, we add them to the metaflow imports
+                            mf_imports.add(node.func.id)
+            except SyntaxError:
+                pass
 
         # We start building the script starting with the metaflow base import
         script = [f"from metaflow import {', '.join(sorted(mf_imports))}\n"]
@@ -109,18 +127,26 @@ class FlowRegistry:
                 script.append(textwrap.indent(code.strip(), INDENT) + "\n")
                 
         # Adding steps
-        for step_name, (body, is_join) in flow.steps.items():
-
+        for step_name, step_tags in flow.steps.items():
             # Adding step decorator
             if step_name in flow.step_decorators:
                 for tag_grouped_decorators in flow.step_decorators[step_name].values():
                     for decorator in tag_grouped_decorators:
                         script.append(f"{INDENT}{decorator}")
             
+            # Step is a join if any of its tags is marked as a join
+            is_join = any(is_j for _, is_j in step_tags.values())
+
             # Adding step
             script.append(f"{INDENT}@step")
             script.append(f"{INDENT}def {step_name}(self{', inputs' if is_join else ''}):")
-            script.append(textwrap.indent(body.strip(), INDENT * 2) + "\n")
+            
+            # Combine bodies of all tags in insertion order
+            full_body = ""
+            for body, _ in step_tags.values():
+                full_body += "\n" + body.strip() + "\n"
+
+            script.append(textwrap.indent(full_body.strip(), INDENT * 2) + "\n")
 
         # Adding entry point
         script.extend(["if __name__ == '__main__':", f"{INDENT}{flow_name}()"])
