@@ -29,7 +29,7 @@ class MetaflowMagics(Magics):
     @cell_magic
     def mf_step(self, line, cell):
         """
-        %%mf_step [.Step or Flow.Step] [tag] [--join]
+        %%mf_step [Step or Flow.Step] [tag] [--join]
         """
         target, tag = self._extract_args(line, is_step=True)
         is_join = "--join" in line.lower()
@@ -56,7 +56,7 @@ class MetaflowMagics(Magics):
     @cell_magic
     def mf_decorator(self, line, cell):
         """
-        %%mf_decorator [.Step or Flow.Step or Flow or _] [tag]
+        %%mf_decorator [Step or Flow.Step or Flow or _] [tag]
         """
         target, tag = self._extract_args(line)
         decorators = [l.strip() for l in cell.split("\n") if l.strip()]
