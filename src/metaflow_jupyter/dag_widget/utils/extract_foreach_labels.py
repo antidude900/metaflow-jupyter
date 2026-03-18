@@ -14,7 +14,6 @@ def extract_static_foreach_labels(flow_cls, graph):
 
             # Find the variable name passed to foreach= in self.next()
             foreach_param = node.foreach_param
-            print("param",foreach_param)
 
             # pulls the raw python source and parses into the ast
             src = textwrap.dedent(inspect.getsource(getattr(flow_cls, nid)))

@@ -46,17 +46,24 @@ function renderNode(svg, node, pos, { CONFIG, model }) {
 
     // Badge (Type or Foreach Count)
     let badgeText = (node.status || node.type).toUpperCase();
-    if (isForeach) {
-        badgeText = `${node.foreach.finished}/${node.foreach.total}`;
-    } else if (node.type === "foreach") {
-        badgeText = "FOREACH";
-    }
-
     nodeGroup.appendChild(createSvgElement("text", {
         x: pos.x - nodeWidth / 2 + 6,
         y: pos.y - nodeHeight / 2 + 10,
         class: "dag-node-badge",
     }, badgeText));
+
+
+    if (isForeach) {
+        let done = !node.status ? "---" : node.foreach.finished;
+        let total = node.foreach.total === -1 ? "---" : node.foreach.total;
+
+        nodeGroup.appendChild(createSvgElement("text", {
+            x: pos.x + nodeWidth / 2 - 6,
+            y: pos.y - nodeHeight / 2 + 10,
+            class: "dag-node-badge",
+            style: "text-anchor: end"
+        }, `${done} / ${total}`));
+    }
 
     // Click handler for foreach dropdown
     nodeGroup.onclick = (e) => {

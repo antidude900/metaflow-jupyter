@@ -1,4 +1,4 @@
-import asyncio
+import asyncio, os
 from pathlib import Path
 from metaflow import FlowSpec, NBRunner
 from .bundle_ui import bundle_js, bundle_css
@@ -29,39 +29,44 @@ class DagWidget(anywidget.AnyWidget):
     executionStatus = traitlets.Unicode("").tag(sync=True)
     activeDropMenus = traitlets.List([]).tag(sync=True)
 
-    def __init__(self, flow_cls, run=False, showLogs=True, **kwargs):
+    def __init__(self, flow_cls, runner=None, run=False, showLogs=True, filename=None,**kwargs):
         """
         Initialize the DagWidget.
-        For Static View: run = False which uses the graph structure of the Flow
-        For Live View: run = True which runs the Flow execution, tracks the changes and updates the graph structure
+        For Static View: run = False 
+        For Live View: run = True or pass a pre-configured runner.
         
         """
 
         super().__init__()
-
         # Ensure flow_cls is a subclass of FlowSpec   
         if not (isinstance(flow_cls, type) and issubclass(flow_cls, FlowSpec)):
             raise ValueError("DagWidget requires a Metaflow Flow class.")
 
-        # Populate widget state with flow metadata and graph structure
-       
+        # If a runner is passed, we are definitely in Live View
+        if runner:
+            run = True
+
         self.flow_name = flow_cls.__name__
         self.subtitle = "(Execution)" if run else "(Structure)"
-        if run: self.executionStatus = "Starting the Run"
+        if run: self.executionStatus = "Starting..."
 
         # Extract graph structure of the flow class for flow visualization
         self.nodes, self.edges, self.layers = extract_graph(flow_cls)
 
-        # Initialize node status to pending if Live View (so that the node types don't get rendered intitally in Live View)
+        # Initialize node status to pending if Live View
         if run:
             self.nodes = [{**node, "status": "pending"} for node in self.nodes]
         
-        # If Live View, we track the running instance (check every 0.5 second) which is used to update the node status
-        # Make the instance run in background without blocking the Jupyter cell
-        asyncio.create_task(self._run_and_track(NBRunner(flow_cls, **kwargs), flow_cls, showLogs)) if run else None
+        # If Live View, we start the tracking task
+        if run:
+            # If no runner provided, fall back to default NBRunner (standard Jupyter behavior)
+            if not runner:
+                runner = NBRunner(flow_cls, **kwargs)
+                
+            asyncio.create_task(self._run_and_track(runner, flow_cls, showLogs, filename))
 
 
-    async def _run_and_track(self, runner, flow_cls, showLogs):
+    async def _run_and_track(self, runner, flow_cls, showLogs, filename):
         """
         Run the Flow execution while updating the widget UI in real-time (coordinates both processes)
 
@@ -70,7 +75,7 @@ class DagWidget(anywidget.AnyWidget):
             # Start the Flow execution asynchronously 
             executing = await runner.async_run()
             
-            self.executionStatus = "Running"
+            self.executionStatus = "Running..."
             self.nodes = [{**node, "status": "running"} if node["id"] == "start" else node for node in self.nodes]
 
             runningInstance = executing.run
@@ -102,11 +107,14 @@ class DagWidget(anywidget.AnyWidget):
 
         except Exception as e:
             # Catch early errors (like validation failures) and print them to the cell
-            print(f"{e}", flush=True)
+            print(f"{e}")
 
-        # After the Flow execution is complete, clean up the temp file created By NBRunner
+        # After the Flow execution is complete, clean up
         finally:
             self.executionStatus = "Ended"
             runner.cleanup()
+            if filename and os.path.exists(filename):
+                os.remove(filename)
+                
     
 

@@ -2,7 +2,7 @@
 
 __version__ = "0.1.0"
 
-from .dag_widget import DagWidget  # noqa: F401
+from .dag_widget import DagWidget
 
 
 def load_ipython_extension(ipython):
