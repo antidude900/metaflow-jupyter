@@ -1,20 +1,41 @@
-function renderHeader(svg, { flowName, subtitle, canvasWidth }) {
-    if (!flowName) return 0;
+import { createSvgElement } from "../utils.js";
 
-    svg.appendChild(createSvgElement("text", {
+export function renderHeader({ flowName, subtitle, status, canvasWidth }) {
+    if (!flowName) return null;
+
+    // Create a contianer for all the header elements
+    const headerGroup = createSvgElement("g", { class: "dag-header" });
+
+    // Vertical Positioning for our header elements
+    const TITLE_Y = 24;
+    const SUBTITLE_Y = 44;
+    const edgePadding = 20;
+
+    // Title
+    headerGroup.appendChild(createSvgElement("text", {
         x: canvasWidth / 2,
-        y: 20,
+        y: TITLE_Y,
         class: "dag-title"
     }, flowName));
 
+    // Subtitle
     if (subtitle) {
-        svg.appendChild(createSvgElement("text", {
+        headerGroup.appendChild(createSvgElement("text", {
             x: canvasWidth / 2,
-            y: 38,
+            y: SUBTITLE_Y,
             class: "dag-subtitle"
         }, subtitle));
-        return 50;
     }
 
-    return 32;
+    // Execution Status
+    if (status) {
+        headerGroup.appendChild(createSvgElement("text", {
+            x: canvasWidth - edgePadding,
+            y: TITLE_Y,
+            class: "dag-header-status",
+            style: "text-anchor: end"
+        }, status.toUpperCase()));
+    }
+
+    return headerGroup;
 }

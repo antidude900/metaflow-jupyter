@@ -29,6 +29,11 @@
 	pointer-events: none;
 }
 
+.node-group {
+	cursor: pointer;
+	transition: opacity 0.2s ease;
+}
+
 .node-foreach {
 	cursor: pointer;
 }

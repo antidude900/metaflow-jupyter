@@ -1,10 +1,11 @@
 import asyncio, os
 from pathlib import Path
 from metaflow import FlowSpec, NBRunner
+from metaflow.exception import MetaflowException
 from .bundle_ui import bundle_js, bundle_css
 from .utils import extract_graph, update_status
 import anywidget
-import traitlets
+from traitlets import List,Unicode
 
 class DagWidget(anywidget.AnyWidget):
     """
@@ -13,6 +14,8 @@ class DagWidget(anywidget.AnyWidget):
     2. Live execution progress
 
     """
+
+    _active_task = None
     
     # Load the Javascript Budle and CSS file to the widget
     _esm = bundle_js()
@@ -20,14 +23,11 @@ class DagWidget(anywidget.AnyWidget):
 
     # Initialize the widget states using Traitlets 
     # Automatically syncs Widget Class state to the UI state (Python to JS bi-directional sync))
-
-    nodes = traitlets.List([]).tag(sync=True)
-    edges = traitlets.List([]).tag(sync=True)
-    layers = traitlets.List([]).tag(sync=True)
-    flow_name = traitlets.Unicode("").tag(sync=True)
-    subtitle = traitlets.Unicode("").tag(sync=True)
-    executionStatus = traitlets.Unicode("").tag(sync=True)
-    activeDropMenus = traitlets.List([]).tag(sync=True)
+    nodes = List([]).tag(sync=True)
+    edges = List([]).tag(sync=True)
+    flow_name = Unicode("").tag(sync=True)
+    subtitle = Unicode("").tag(sync=True)
+    executionStatus = Unicode("").tag(sync=True)
 
     def __init__(self, flow_cls, runner=None, run=False, showLogs=True, filename=None,**kwargs):
         """
@@ -36,6 +36,9 @@ class DagWidget(anywidget.AnyWidget):
         For Live View: run = True or pass a pre-configured runner.
         
         """
+        # Cancel previous run if still active
+        if DagWidget._active_task and not DagWidget._active_task.done():
+            DagWidget._active_task.cancel()
 
         super().__init__()
         # Ensure flow_cls is a subclass of FlowSpec   
@@ -51,7 +54,11 @@ class DagWidget(anywidget.AnyWidget):
         if run: self.executionStatus = "Starting..."
 
         # Extract graph structure of the flow class for flow visualization
-        self.nodes, self.edges, self.layers = extract_graph(flow_cls)
+        try:
+            self.nodes, self.edges = extract_graph(flow_cls)
+        except MetaflowException as e:
+            # Display validation errors cleanly without long traceback
+            raise ValueError(f"Flow validation failed: {str(e)}") from None
 
         # Initialize node status to pending if Live View
         if run:
@@ -62,8 +69,10 @@ class DagWidget(anywidget.AnyWidget):
             # If no runner provided, fall back to default NBRunner (standard Jupyter behavior)
             if not runner:
                 runner = NBRunner(flow_cls, **kwargs)
-                
-            asyncio.create_task(self._run_and_track(runner, flow_cls, showLogs, filename))
+            
+            # Run the flow and track the execution asynchronously
+            # And record that as a active task to later cancel it manually if needed
+            DagWidget._active_task = asyncio.create_task(self._run_and_track(runner, flow_cls, showLogs, filename))
 
 
     async def _run_and_track(self, runner, flow_cls, showLogs, filename):
@@ -72,9 +81,9 @@ class DagWidget(anywidget.AnyWidget):
 
         """
         try:
-            # Start the Flow execution asynchronously 
+            # Start the Flow execution asynchronously
             executing = await runner.async_run()
-            
+
             self.executionStatus = "Running..."
             self.nodes = [{**node, "status": "running"} if node["id"] == "start" else node for node in self.nodes]
 
@@ -82,10 +91,10 @@ class DagWidget(anywidget.AnyWidget):
 
             # Run another background process to stream logs (standard output) from Metaflow to the notebook
             async def _stream():
-            
+
                 async for _, line in executing.stream_log("stdout"):
                     print(line, end="\n", flush=True)
-                
+
             if showLogs: asyncio.create_task(_stream())
 
             # Seed foreach_labels once from statically extracted labels (from extract_graph AST)
@@ -104,11 +113,12 @@ class DagWidget(anywidget.AnyWidget):
 
             # Final update at the end to ensure we didn't miss any update
             self.nodes = update_status(self.nodes, runningInstance, flow_cls, foreach_labels)
-
+        except asyncio.CancelledError:
+            pass
         except Exception as e:
-            # Catch early errors (like validation failures) and print them to the cell
-            print(f"{e}")
-
+            # Catch early errors (that occurs before the run) and print them to the cell
+            print(str(e),flush=True)
+        
         # After the Flow execution is complete, clean up
         finally:
             self.executionStatus = "Ended"

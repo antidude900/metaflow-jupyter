@@ -11,3 +11,10 @@
 	font-weight: 500;
 	fill: #64748b;
 }
+
+.dag-header-status {
+	font-size: 10px;
+	font-weight: 700;
+	fill: #3b82f6; /* Blue for status */
+	letter-spacing: 0.05em;
+}

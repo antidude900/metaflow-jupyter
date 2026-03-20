@@ -12,24 +12,37 @@ def extract_static_foreach_labels(flow_cls, graph):
         labels = None
         try:
 
-            # Find the variable name passed to foreach= in self.next()
-            foreach_param = node.foreach_param
+            # Get the variable name passed to foreach_param in self.next()
+            varname = node.foreach_param
 
             # pulls the raw python source and parses into the ast
             src = textwrap.dedent(inspect.getsource(getattr(flow_cls, nid)))
             tree = ast.parse(src)
 
             # Find the value of the variable
-            if foreach_param:
-                for statement in ast.walk(tree):
-                    # check if the statement is an assignment statement
+            if varname:
+                # Get the function definition (the first body element)
+                func_def = tree.body[0]
+
+                # Iterate through top-level statements
+                for statement in func_def.body:
+                    # Check if the statement is a top-level assignment
                     if isinstance(statement, ast.Assign):
-                        # as python supports multi-assignment, statement.targets returns a list
                         for target in statement.targets:
-                            # it should have a attribute(self.) and check if the attribute name matches with the variable name
-                            if (isinstance(target, ast.Attribute) and target.attr == foreach_param):
-                                # we extract the values and save it to labels
+                            if isinstance(target, ast.Attribute) and target.attr == varname:
                                 labels = [str(i) for i in ast.literal_eval(statement.value)]
+
+                    # Check for ANY nested assignments to the same variable
+                    for ast_node in ast.walk(statement):
+                        # Skip the statement itself (only check nested nodes)
+                        if ast_node is statement:
+                            continue
+                        if isinstance(ast_node, ast.Assign):
+                            for target in ast_node.targets:
+                                if isinstance(target, ast.Attribute) and target.attr == varname:
+                                    # Found nested assignment - can't be certain, fall back to dynamic
+                                    labels = None
+                                    break
         except Exception:
             pass
         foreach_tasks[node.out_funcs[0]] = labels

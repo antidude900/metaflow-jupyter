@@ -1,4 +1,4 @@
-const CONFIG = {
+export const CONFIG = {
     status: {
         pending: "gray",
         running: "blue",
@@ -20,6 +20,6 @@ const CONFIG = {
         paddingL: 60,
         paddingR: 60,
         paddingY: 60,
-        titleHeight: 32,
+        headerHeight: 64,
     },
 };

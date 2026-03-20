@@ -1,129 +1,172 @@
+import { getLayout, createSvgElement, getNextSteps } from "./utils.js";
+import { renderHeader } from "./components/header.js";
+import { renderEdge, arrowHead } from "./components/edge.js";
+import { renderNode } from "./components/node.js";
+import { renderForeachDropdown } from "./components/dropdown.js";
+
 function render({ model, el }) {
-    el.classList.add("dag-widget-el");
+    // Initializing the DOM with SVG and Overlay layers
+    // SVG Layer: For Rendering the DAG structure (nodes, edges, headers)
+    // Overlay Layer: For Rendering Dropdowns
+    el.innerHTML = `
+        <div class="dag-widget-container">
+            <div id="svgLayer"></div>
+            <div id="overlayLayer"></div>
+        </div>
+    `;
 
-    const container = document.createElement("div");
-    container.classList.add("dag-widget-container");
-    el.appendChild(container);
+    const svgLayer = el.querySelector("#svgLayer");
+    const overlayLayer = el.querySelector("#overlayLayer");
+    let layout;
 
-    const svgLayer = document.createElement("div");
-    const overlayLayer = document.createElement("div");
-    container.appendChild(svgLayer);
-    container.appendChild(overlayLayer);
+    // Render DAG
+    const renderDag = () => {
+        const state = {
+            nodes: model.get("nodes"),
+            edges: model.get("edges"),
+            flowName: model.get("flow_name"),
+            subtitle: model.get("subtitle"),
+            globalStatus: model.get("executionStatus")
+        };
 
-    let positions = {};
 
-    const drawSvg = () => {
-        const nodes = model.get("nodes");
-        const edges = model.get("edges");
-        const layers = model.get("layers");
-        const flowName = model.get("flow_name");
-        const subtitle = model.get("subtitle");
-        const executionStatus = model.get("executionStatus");
-
-        const { nodeWidth } = CONFIG.dimensions;
-        const headerParams = { flowName, subtitle };
-
-        const tempSvg = createSvgElement("svg");
-        const headerH = renderHeader(tempSvg, { ...headerParams, canvasWidth: 0 });
-
-        const layoutParams = { ...CONFIG.dimensions, headerH };
-        positions = computePositions(nodes, layers, layoutParams);
-        const { width: canvasWidth, height: canvasHeight } = computeCanvasSize(nodes, layers, layoutParams);
-        const graphWidth = canvasWidth - layoutParams.paddingL - layoutParams.paddingR;
+        // Compute the layout of the DAG
+        // (position of each node and the size of canvas for svg on which we put other svg elements)
+        if (!layout) layout = getLayout(state.nodes);
+        const nodePositions = layout.positions;
 
         const svg = createSvgElement("svg", {
-            width: canvasWidth,
-            height: canvasHeight,
-            viewBox: `0 0 ${canvasWidth} ${canvasHeight}`,
+            width: layout.width,
+            height: layout.height,
+            viewBox: `0 0 ${layout.width} ${layout.height}`
         });
 
-        svg.appendChild(
-            createSvgElement("defs", {},
-                createSvgElement("marker", {
-                    id: "arrowhead",
-                    markerWidth: "10",
-                    markerHeight: "7",
-                    refX: "9",
-                    refY: "3.5",
-                    orient: "auto",
-                }, createSvgElement("polygon", { points: "0 0, 10 3.5, 0 7", fill: "#94a3b8" }))
-            )
-        );
+        // 4. Render Header Part
+        svg.appendChild(renderHeader({
+            flowName: state.flowName,
+            subtitle: state.subtitle,
+            status: state.globalStatus,
+            canvasWidth: layout.width
+        }));
 
-        renderHeader(svg, { ...headerParams, canvasWidth: layoutParams.paddingL * 2 + graphWidth });
-        edges.forEach(edge => {
-            if (positions[edge.from] && positions[edge.to])
-                renderEdge(svg, edge, positions, { nodeWidth });
-        });
-        nodes.forEach(node => {
-            const pos = positions[node.id];
-            if (pos) renderNode(svg, node, pos, { ...CONFIG.dimensions, CONFIG, model });
+        // Making arrowHead for the edge's line 
+        svg.appendChild(arrowHead());
+
+        // Render the edges
+        state.edges.forEach(edge => {
+            if (nodePositions[edge.from] && nodePositions[edge.to]) {
+                svg.appendChild(renderEdge(edge, nodePositions));
+            }
         });
 
+        // Render the nodes
+        state.nodes.forEach(node => {
+            if (nodePositions[node.id]) {
+                svg.appendChild(renderNode(node, nodePositions[node.id], model, applyFocusHighlight));
+            }
+        });
+
+        // Insert our svg canvas in the svgLayer of our DOM
         svgLayer.innerHTML = "";
         svgLayer.appendChild(svg);
 
-        if (executionStatus) {
-            const loading = document.createElement("div");
-            loading.classList.add("dag-loading");
-            loading.textContent = executionStatus;
-            svgLayer.appendChild(loading);
-        }
     };
 
-    // Full redraw of dropdowns — only triggered when menus open/close
-    const drawOverlay = () => {
-        const nodes = model.get("nodes");
-        const activeDropMenus = model.get("activeDropMenus") || [];
-        const { nodeWidth } = CONFIG.dimensions;
+    // Apply focus highlight to the nodes and edges when hovered
+    const applyFocusHighlight = (focusedNodeId) => {
+        const svg = svgLayer.querySelector("svg");
+        if (!svg) return;
 
+        // Get all steps for the focused highlight
+        const nextSteps = focusedNodeId
+            ? getNextSteps(focusedNodeId, model.get("edges"))
+            : null;
+
+        // Check every node if they are in the list of steps
+        // If not, dim them
+        svg.querySelectorAll(".node-group").forEach(group => {
+            const stepId = group.getAttribute("data-step");
+            const isVisible = !nextSteps || nextSteps.has(stepId);
+            group.style.opacity = isVisible ? "1" : "0.15";
+        });
+
+        // Check every edge if they are in the list of steps
+        // If not, dim them
+        svg.querySelectorAll(".dag-edge-path").forEach(path => {
+            const from = path.getAttribute("data-from");
+            const to = path.getAttribute("data-to");
+            const isVisible = !nextSteps || (nextSteps.has(from) && nextSteps.has(to));
+            path.style.opacity = isVisible ? "1" : "0.1";
+        });
+    };
+
+
+    // Render the foreach dropdown
+    const renderOverlay = () => {
+        // Clear the old overlays and render fresh ones (if not, then duplicates will appear)
         overlayLayer.innerHTML = "";
-        activeDropMenus.forEach(nodeId => {
-            const activeNode = nodes.find(n => n.id === nodeId);
-            if (activeNode?.foreach)
-                overlayLayer.appendChild(renderForeachDropdown(activeNode, positions[nodeId], { nodeWidth, model }));
-        });
-    };
 
-    // Patch task status classes in-place — preserves scroll position on every status poll.
-    // Falls back to a full drawOverlay() if the rendered item count has changed
-    // (e.g. empty-state dropdown just received its first real task list).
-    const updateDropMenu = () => {
+        // Get list of all those nodes whose dropdown is active
+        const activeIds = model.get("activeDropMenus") || [];
         const nodes = model.get("nodes");
-        const activeDropMenus = model.get("activeDropMenus") || [];
-        let needsFullRedraw = false;
 
-        activeDropMenus.forEach(nodeId => {
-            const activeNode = nodes.find(n => n.id === nodeId);
-            if (!activeNode?.foreach?.tasks) return;
-
-            const dropdown = overlayLayer.querySelector(`[data-step="${nodeId}"]`);
-            if (!dropdown) return;
-
-            const existingItems = dropdown.querySelectorAll(".dag-task-item");
-            if (existingItems.length !== activeNode.foreach.tasks.length) {
-                needsFullRedraw = true;
-                return;
+        // For each of the active nodes, render the dropdown
+        activeIds.forEach(id => {
+            const node = nodes.find(n => n.id === id);
+            if (node?.foreach && nodePositions[id]) {
+                const dropdown = renderForeachDropdown(node, nodePositions[id], model);
+                overlayLayer.appendChild(dropdown);
             }
-
-            activeNode.foreach.tasks.forEach((task, i) => {
-                if (existingItems[i]) existingItems[i].className = `dag-task-item status-${task.status}`;
-            });
         });
-
-        if (needsFullRedraw) drawOverlay();
     };
 
-    model.on("change:nodes", () => { drawSvg(); updateDropMenu(); });
-    model.on("change:edges", drawSvg);
-    model.on("change:layers", drawSvg);
-    model.on("change:flow_name", drawSvg);
-    model.on("change:subtitle", drawSvg);
-    model.on("change:executionStatus", drawSvg);
-    model.on("change:activeDropMenus", drawOverlay);
+    // Sync the items in the dropdown with the new status of the node's tasks
+    const syncDropdownStatus = () => {
+        // Get list of all those nodes whose dropdown is active
+        const activeIds = model.get("activeDropMenus") || [];
+        const nodes = model.get("nodes");
 
-    drawSvg();
-    drawOverlay();
+        // We access each dropdown's DOM element with the custom attribute we set to it: data-step=node_id
+        activeIds.forEach(id => {
+            const nodeState = nodes.find(n => n.id === id);
+            const existingDropdown = overlayLayer.querySelector(`[data-step="${id}"]`);
+
+            if (!existingDropdown || !nodeState?.foreach?.tasks) return;
+
+            // Get all the task items of  the dropdown
+            const listItems = existingDropdown.querySelectorAll(".dag-task-item");
+
+            // Check if the tasks count in the node state is equal to task count in the dropdown
+            // The task count may change if task fetch before failed and then later was successfull
+            const isQuantitySynced = nodeState.foreach.tasks.length === listItems.length;
+
+            if (isQuantitySynced) {
+                // Update the status of each task 
+                // Simply changing the status- classname which changes its color CSS
+                nodeState.foreach.tasks.forEach((task, index) => {
+                    listItems[index].className = `dag-task-item status-${task.status}`;
+                });
+            } else {
+                // if the task count changed, trigger full overlay re-render of that node to display the new tasks
+                // else just the status change only requires changing the classname of the task item 
+                renderOverlay();
+            }
+        });
+    };
+
+    // Set Change Listeners to each of the given states and re-render DAG on change
+    const listenForChange = ["nodes", "edges", "flow_name", "subtitle", "executionStatus"];
+    listenForChange.forEach(key => model.on(`change:${key}`, renderDag));
+
+    // When node changes, sync the item in the dropdown with the node's status
+    model.on("change:nodes", syncDropdownStatus);
+
+    // Check for dropdown open/close actios and render the active ones
+    model.on("change:activeDropMenus", renderOverlay);
+
+    // Intiail Render
+    renderDag();
+    renderOverlay();
 }
 
 export default { render };

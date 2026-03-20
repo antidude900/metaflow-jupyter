@@ -1,12 +1,16 @@
 from .compute_layout import compute_layout
 from .extract_foreach_labels import extract_static_foreach_labels
+from metaflow.lint import linter
 
 
 def extract_graph(flow_cls):
-    """ 
-    Parse FlowSpec graph into nodes, edges, and layers for UI
+    """
+    Parse FlowSpec graph into nodes, edges, and position for UI
     """
     graph = flow_cls._graph
+
+    # Validate the flow structure before extracting
+    linter.run_checks(graph)
     """
     We calibrate the graph to match the widget UI design:
 
@@ -30,14 +34,14 @@ def extract_graph(flow_cls):
             calibrate[node_id] = node_id
 
     # Calculate the position of each node in the graph
-    rows, layers = compute_layout(graph)
+    rows, columns = compute_layout(graph)
 
     # extract the labels for the tasks of foreach node
     foreach_child = extract_static_foreach_labels(flow_cls, graph)
 
     # Store the name, type, position and tasks of each node
     nodes = [
-        {"id": nid, "type": calibrate[nid], "row": rows[nid], **({
+        {"id": nid, "type": calibrate[nid], "position": [rows[nid], columns[nid]], **({
             "foreach": {
                 "total": len(foreach_child[nid]) if foreach_child[nid] is not None else -1,
                 "finished": 0,
@@ -55,4 +59,4 @@ def extract_graph(flow_cls):
         if next_id in rows
     ]
 
-    return nodes, edges, layers
+    return nodes, edges
