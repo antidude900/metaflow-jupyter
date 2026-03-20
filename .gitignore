@@ -6,4 +6,4 @@ build/
 .venv/
 *.egg
 .ipynb_checkpoints/
-.metaflow
+.metaflow/
