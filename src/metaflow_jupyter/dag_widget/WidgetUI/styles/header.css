@@ -2,19 +2,19 @@
 	text-anchor: middle;
 	font-size: 14px;
 	font-weight: 700;
-	fill: #1e293b;
+	fill: #146ee6;
 }
 
 .dag-subtitle {
 	text-anchor: middle;
 	font-size: 11px;
 	font-weight: 500;
-	fill: #64748b;
+	fill: #146ee6;
 }
 
 .dag-header-status {
 	font-size: 10px;
 	font-weight: 700;
-	fill: #3b82f6; /* Blue for status */
+	fill: #146ee6;
 	letter-spacing: 0.05em;
 }

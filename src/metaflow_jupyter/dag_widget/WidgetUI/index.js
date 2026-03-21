@@ -17,7 +17,8 @@ function render({ model, el }) {
 
     const svgLayer = el.querySelector("#svgLayer");
     const overlayLayer = el.querySelector("#overlayLayer");
-    let layout;
+    let layout, nodePositions;
+
 
     // Render DAG
     const renderDag = () => {
@@ -32,8 +33,10 @@ function render({ model, el }) {
 
         // Compute the layout of the DAG
         // (position of each node and the size of canvas for svg on which we put other svg elements)
-        if (!layout) layout = getLayout(state.nodes);
-        const nodePositions = layout.positions;
+        if (!layout) {
+            layout = getLayout(state.nodes);
+            nodePositions = layout.positions;
+        }
 
         const svg = createSvgElement("svg", {
             width: layout.width,
@@ -72,34 +75,6 @@ function render({ model, el }) {
 
     };
 
-    // Apply focus highlight to the nodes and edges when hovered
-    const applyFocusHighlight = (focusedNodeId) => {
-        const svg = svgLayer.querySelector("svg");
-        if (!svg) return;
-
-        // Get all steps for the focused highlight
-        const nextSteps = focusedNodeId
-            ? getNextSteps(focusedNodeId, model.get("edges"))
-            : null;
-
-        // Check every node if they are in the list of steps
-        // If not, dim them
-        svg.querySelectorAll(".node-group").forEach(group => {
-            const stepId = group.getAttribute("data-step");
-            const isVisible = !nextSteps || nextSteps.has(stepId);
-            group.style.opacity = isVisible ? "1" : "0.15";
-        });
-
-        // Check every edge if they are in the list of steps
-        // If not, dim them
-        svg.querySelectorAll(".dag-edge-path").forEach(path => {
-            const from = path.getAttribute("data-from");
-            const to = path.getAttribute("data-to");
-            const isVisible = !nextSteps || (nextSteps.has(from) && nextSteps.has(to));
-            path.style.opacity = isVisible ? "1" : "0.1";
-        });
-    };
-
 
     // Render the foreach dropdown
     const renderOverlay = () => {
@@ -119,6 +94,36 @@ function render({ model, el }) {
             }
         });
     };
+
+
+    // Apply focus highlight to the nodes and edges when hovered
+    const applyFocusHighlight = (focusedNodeId) => {
+        const svg = svgLayer.querySelector("svg");
+        if (!svg) return;
+
+        // Get all steps for the focused highlight
+        const nextSteps = focusedNodeId
+            ? getNextSteps(focusedNodeId, model.get("edges"))
+            : null;
+
+        // Check every node if they are in the list of steps
+        // If not, dim them
+        svg.querySelectorAll(".node-group").forEach(group => {
+            const stepId = group.getAttribute("data-step");
+            const isVisible = !nextSteps || nextSteps.has(stepId);
+            group.style.opacity = isVisible ? "1" : "0.25";
+        });
+
+        // Check every edge if they are in the list of steps
+        // If not, dim them
+        svg.querySelectorAll(".dag-edge-path").forEach(path => {
+            const from = path.getAttribute("data-from");
+            const to = path.getAttribute("data-to");
+            const isVisible = !nextSteps || (nextSteps.has(from) && nextSteps.has(to));
+            path.style.opacity = isVisible ? "1" : "0.25";
+        });
+    };
+
 
     // Sync the items in the dropdown with the new status of the node's tasks
     const syncDropdownStatus = () => {
@@ -153,6 +158,7 @@ function render({ model, el }) {
             }
         });
     };
+
 
     // Set Change Listeners to each of the given states and re-render DAG on change
     const listenForChange = ["nodes", "edges", "flow_name", "subtitle", "executionStatus"];

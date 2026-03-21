@@ -31,11 +31,9 @@ export const getLayout = (nodes) => {
         // To find our cell's vertical position, we have to give space for other cells above it + padding of the canvas + header height
         const cellY = paddingY + (row * cellHeight) + headerHeight;
 
-        // Final coordinate is the center of the nodebox 
-        // So adding nodeWidth/2 and nodeHeight/2 to move it from the top-left corner to the center
         positions[node.id] = {
-            x: cellX + nodeWidth / 2,
-            y: cellY + nodeHeight / 2
+            x: cellX,
+            y: cellY
         };
     });
 

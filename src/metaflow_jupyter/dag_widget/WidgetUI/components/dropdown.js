@@ -2,7 +2,7 @@ import { CONFIG } from "../config.js";
 
 export function renderForeachDropdown(node, pos, model) {
     const tasks = node.foreach.tasks || [];
-    const nodeWidth = CONFIG.dimensions.nodeWidth
+    const nodeHeight = CONFIG.dimensions.nodeHeight
 
     // Dimension Configuration of the dropdown
     const dropdownConfig = {
@@ -17,9 +17,13 @@ export function renderForeachDropdown(node, pos, model) {
     const DropdownHeight = (tasks.length > 0 ? tasks.length * dropdownConfig.itemHeight : dropdownConfig.itemHeight) + dropdownConfig.padding;
     const finalDropdownHeight = Math.min(DropdownHeight, dropdownConfig.maxHeight);
 
-    // Align to the left top of the target node
-    const containerLeft = pos.x - (nodeWidth / 2) - dropdownConfig.width - dropdownConfig.gapFromNode;
-    const containerTop = pos.y - (finalDropdownHeight / 2);
+    // Put the dropdown at the left side of the node
+    const containerLeft = pos.x - dropdownConfig.width - dropdownConfig.gapFromNode;
+
+    // We first bring its top at same level as the center
+    // then shift it up by half of the dropdown height
+    // which aligns the dropdown's center to the center of the node
+    const containerTop = pos.y + (nodeHeight / 2) - (finalDropdownHeight / 2);
 
     // Build the container for the dropdown and position it 
     const container = document.createElement("div");
@@ -82,7 +86,7 @@ export function renderForeachDropdown(node, pos, model) {
         });
     }
 
-    container.appendChild(listScrollContainer);
+    container.appendChild(listContainer);
     container.onclick = (e) => e.stopPropagation();
 
     return container;

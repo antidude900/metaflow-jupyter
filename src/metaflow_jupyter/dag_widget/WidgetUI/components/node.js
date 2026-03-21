@@ -1,49 +1,48 @@
 import { createSvgElement } from "../utils.js";
 import { CONFIG } from "../config.js";
 
-export function renderNode(node, pos, model, onHover) {
+export function renderNode(node, pos, model, highlight) {
 
     const { nodeWidth, nodeHeight } = CONFIG.dimensions
     const isForeach = node.type === "foreach";
 
-    // 1. Resolve Layout Geometry
-    const topLeft = { x: pos.x - nodeWidth / 2, y: pos.y - nodeHeight / 2 };
+    // SVG <rect> element anchors at top-left corner
+    const topLeft = pos;
 
-    // Determine Color (Live view overrides static type color)
+    // Color of each node
     const fillColor = node.status
-        ? (CONFIG.status[node.status] || "#cbd5e1")
-        : (CONFIG.nodeTypes[node.type] || "#94a3b8");
+        ? (CONFIG.status[node.status])
+        : (CONFIG.nodeTypes[node.type]);
 
-    // 2. Initialize the Node Group
+    // We combine all the elements of the node into a group which becomes our final node
     const group = createSvgElement("g", {
         class: `node-group ${isForeach ? 'node-foreach' : ''}`,
         "data-step": node.id
     });
 
-    // 3. Build Node Visuals Layer-by-Layer
+    // Add the box and label of the node
     group.appendChild(createNodeBox(topLeft, nodeWidth, nodeHeight, fillColor));
     group.appendChild(createNodeLabel(node.id, topLeft, nodeWidth, nodeHeight));
 
-    // 4. Primary Metadata Badge (Status / Type)
+    // Add the type of the node
     const badgeY = topLeft.y + 10;
     const badgeLabel = (node.status || node.type).toUpperCase();
     group.appendChild(createBadgeElement(badgeLabel, topLeft.x + 6, badgeY));
 
-    // 5. Foreach Extensions (Secondary Progress Badge + Hover Toggle)
+    // Add the task count of the node and the click event for the foreach type node
     if (isForeach) {
         group.appendChild(createForeachCountBadge(node.foreach, node.status, topLeft.x + nodeWidth - 6, badgeY));
         setupForeachInteractions(group, node.id, model);
     }
 
-    // 6. Global Node Events
-    group.onmouseenter = () => onHover?.(node.id);
-    group.onmouseleave = () => onHover?.(null);
+    // Hover event on the node enables focus highlight
+    group.onmouseenter = () => highlight(node.id);
+    group.onmouseleave = () => highlight(null);
 
     return group;
 }
 
-// --- Internal Visual Components (Helpers) ---
-
+// Creates Box For the Node
 function createNodeBox(pos, width, height, fill) {
     return createSvgElement("rect", {
         x: pos.x, y: pos.y, rx: 8,
@@ -52,6 +51,7 @@ function createNodeBox(pos, width, height, fill) {
     });
 }
 
+// Displays Name of the Node
 function createNodeLabel(label, pos, width, height) {
     const container = createSvgElement("foreignObject", {
         x: pos.x + 10, y: pos.y,
@@ -69,6 +69,7 @@ function createNodeLabel(label, pos, width, height) {
     return container;
 }
 
+// Displays Type of the Node
 function createBadgeElement(text, x, y, anchor = "start") {
     return createSvgElement("text", {
         x, y, class: "dag-node-badge",
@@ -76,12 +77,14 @@ function createBadgeElement(text, x, y, anchor = "start") {
     }, text);
 }
 
+// If foreach type node, displays the task count
 function createForeachCountBadge(data, nodeStatus, x, y) {
     const finished = !nodeStatus ? "---" : data.finished;
     const total = data.total === -1 ? "---" : data.total;
     return createBadgeElement(`${finished} / ${total}`, x, y, "end");
 }
 
+// Enables click event for foreach type node to toggle the dropdown menu
 function setupForeachInteractions(group, id, model) {
     group.onclick = (e) => {
         e.stopPropagation();

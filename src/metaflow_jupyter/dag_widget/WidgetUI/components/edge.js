@@ -15,7 +15,7 @@ export function arrowHead() {
         orient: "auto-start-reverse"
     }, createSvgElement("path", {
         d: "M 0 0 L 10 5 L 0 10 z",
-        fill: "#94a3b8"
+        fill: "#898989"
     })));
 
     return defs
@@ -23,26 +23,23 @@ export function arrowHead() {
 
 
 export function renderEdge({ from, to }, positions) {
-    const nodeWidth = CONFIG.dimensions.nodeWidth
+    const { nodeWidth, nodeHeight } = CONFIG.dimensions;
     const start = positions[from];
     const end = positions[to];
 
     if (!start || !end) return;
 
-    const halfWidth = nodeWidth / 2;
-
-    // To make the arrow touch the side of the node rather than the center,
-    // we account for the halfWidth
-    const exitX = start.x + halfWidth;  // Source node's right edge
-    const entryX = end.x - halfWidth;   // Target node's left edge
+    const start_x = start.x + nodeWidth;  // Source node's right edge
+    const end_x = end.x;                // Target node's left edge
+    const start_y = start.y + (nodeHeight / 2); // Source's middle of edge 
+    const end_y = end.y + (nodeHeight / 2); //Target's middle of edge 
 
     // Midpoint between the two nodes as the control point for the line's curve
-    const midX = (exitX + entryX) / 2;
+    const midX = (start_x + end_x) / 2;
 
     // Bezier curve path format: 
     // M [START_X] [START_Y] C [CP1_X] [CP1_Y], [CP2_X] [CP2_Y], [END_X] [END_Y]
-    // where C is the curve command and CP means control points
-    const pathData = `M ${exitX} ${start.y} C ${midX} ${start.y}, ${midX} ${end.y}, ${entryX} ${end.y}`;
+    const pathData = `M ${start_x} ${start_y} C ${midX} ${start_y}, ${midX} ${end_y}, ${end_x} ${end_y}`;
 
     return (createSvgElement("path", {
         d: pathData,
