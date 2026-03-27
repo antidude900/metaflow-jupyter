@@ -2,11 +2,12 @@ import os
 from IPython.core.magic import Magics, magics_class, line_magic, cell_magic
 from metaflow import Runner
 from .registry import registry
-import sys
+from IPython.display import display
+from .dag_widget import DagWidget
 
 
 @magics_class
-class MetaflowMagics(Magics):
+class FlowMagics(Magics):
     def _extract_args(self, line, is_step=False):
         """
         Extract target (flow name and step(if is_step)) and tag from magic line
@@ -101,37 +102,69 @@ class MetaflowMagics(Magics):
     @line_magic
     def mf_run(self, line):
         """
-        %mf_run [FlowName] [--export]
+        %mf_run [FlowName] [--visualize] [--visualize-static]
         """
+
         args = line.strip().split()
         
-        # Resolve flow name (defaulting to MyFlow if first arg is empty or a flag)
-        if not args or args[0].startswith("--"):
-            flow_name = "MyFlow"
-        else:
+        # Resolve flow name (defaulting to MyFlow)
+        flow_name = "MyFlow"
+        if args and not args[0].startswith("-"):
             flow_name = args[0]
 
-        export = "--export" in [a.lower() for a in args]
+        flags = [a.lower() for a in args]
+        visualize = "--visualize" in flags
+        visualize_static = "--visualize-static" in flags
         
-        # convert the content of cell magics to a python script and run the script using Metaflow Runner
+        # Assemble the source from the Registry
         source = registry.to_script(flow_name)
+        
+        # Compile the source code and register it in the notebook kernal to get the class object
+        compile_source = "\n".join(source)
+        check_filename = f"{flow_name}_compile.py"
+        with open(check_filename, "w") as f:
+            f.write(compile_source)
+       
+        code_obj = compile(compile_source, check_filename, 'exec')
+        exec(code_obj, self.shell.user_ns) 
+        if os.path.exists(check_filename):
+            os.remove(check_filename)
+        
+        flow_cls = self.shell.user_ns.get(flow_name)
+        if not flow_cls:
+            raise ValueError(f"Flow class '{flow_name}' not found!")
 
+        # For static visualization (no run needed)
+        if visualize_static:
+            widget = DagWidget(flow_cls)
+            display(widget)
+            return
+
+        # Writing the script to a file for Client API Runner
         filename = f"{flow_name}.py"
+        source.extend(["if __name__ == '__main__':", f"    {flow_name}()"])
+        source = "\n".join(source)
         with open(filename, "w") as f:
             f.write(source)
 
         try:
-            result = Runner(filename, show_output=True).run()
-            return result.run
+            runner = Runner(filename, show_output=True)
+            
+            if visualize:
+                # For live visualization
+                widget = DagWidget(flow_cls,runner=runner)
+                display(widget)
+                return
+            else:
+                # Normal Run
+                result = runner.run()
+                return result.run
+            
         except Exception as e:
-            # to remove the traceback of IPython
+            # Clean error removing long traceback of IPython
             ErrorName = type(e).__name__
             raise Exception(f"\n{ErrorName}: {e}") from None
-        finally:
-            # remove the python script after the script run completes if export flag is not present
-            if not export and os.path.exists(filename):
-                os.remove(filename)
 
 
 def register_magics(ipython):
-    ipython.register_magics(MetaflowMagics)
+    ipython.register_magics(FlowMagics)
