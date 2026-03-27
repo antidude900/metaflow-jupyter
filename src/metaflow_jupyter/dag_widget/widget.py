@@ -50,7 +50,7 @@ class DagWidget(anywidget.AnyWidget):
             run = True
 
         self.flow_name = flow_cls.__name__
-        self.subtitle = "(Execution)" if run else "(Structure)"
+        self.subtitle = "(Live View)" if run else "(Static View)"
         if run: self.executionStatus = "Starting..."
 
         # Extract graph structure of the flow class for flow visualization
@@ -72,10 +72,10 @@ class DagWidget(anywidget.AnyWidget):
             
             # Run the flow and track the execution asynchronously
             # And record that as a active task to later cancel it manually if needed
-            DagWidget._active_task = asyncio.create_task(self._run_and_track(runner, flow_cls, showLogs, filename))
+            DagWidget._active_task = asyncio.create_task(self._run_and_track(runner, flow_cls, showLogs))
 
 
-    async def _run_and_track(self, runner, flow_cls, showLogs, filename):
+    async def _run_and_track(self, runner, flow_cls, showLogs):
         """
         Run the Flow execution while updating the widget UI in real-time (coordinates both processes)
 
@@ -123,8 +123,11 @@ class DagWidget(anywidget.AnyWidget):
         finally:
             self.executionStatus = "Ended"
             runner.cleanup()
-            if filename and os.path.exists(filename):
-                os.remove(filename)
-                
+
+            # For the ClientAPI Runner
+            if runner:
+                path = getattr(runner, 'flow_file', None)
+                if path and os.path.exists(path):
+                    os.remove(path)
     
 

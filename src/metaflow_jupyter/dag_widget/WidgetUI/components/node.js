@@ -99,3 +99,35 @@ function setupForeachInteractions(group, id, model) {
         model.save_changes();
     };
 }
+
+// Change the status of each node
+export function changeNodeStatus(svg, nodes) {
+    if (!svg) return;
+
+    nodes.forEach(node => {
+        const group = svg.querySelector(`.node-group[data-step="${node.id}"]`);
+        if (!group) return;
+
+        // Update rect fill color
+        const rect = group.querySelector(".dag-node-rect");
+        if (rect) {
+            const fillColor = node.status
+                ? CONFIG.status[node.status]
+                : CONFIG.nodeTypes[node.type];
+            rect.setAttribute("fill", fillColor);
+        }
+
+        // Update status badge text
+        const badges = group.querySelectorAll(".dag-node-badge");
+        if (badges[0]) {
+            badges[0].textContent = (node.status || node.type).toUpperCase();
+        }
+
+        // Update foreach count
+        if (node.type === "foreach" && badges[1]) {
+            const finished = !node.status ? "---" : node.foreach.finished;
+            const total = node.foreach.total === -1 ? "---" : node.foreach.total;
+            badges[1].textContent = `${finished} / ${total}`;
+        }
+    });
+}

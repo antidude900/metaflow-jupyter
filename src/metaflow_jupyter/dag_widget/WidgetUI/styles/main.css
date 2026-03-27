@@ -26,6 +26,10 @@
 	box-sizing: border-box;
 }
 
+#svgLayer {
+	text-align: center;
+}
+
 .dag-widget-svg {
 	display: block;
 }

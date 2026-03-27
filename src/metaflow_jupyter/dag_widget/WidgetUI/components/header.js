@@ -39,3 +39,13 @@ export function renderHeader({ flowName, subtitle, status, canvasWidth }) {
 
     return headerGroup;
 }
+
+// Change the execution status in the header
+export function changeHeaderStatus(svg, status) {
+    if (!svg) return;
+
+    const statusEl = svg.querySelector(".dag-header-status");
+    if (statusEl && status) {
+        statusEl.textContent = status.toUpperCase();
+    }
+}

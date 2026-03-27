@@ -99,3 +99,24 @@ function createDropdownMessage(text) {
     msgElement.textContent = text;
     return msgElement;
 }
+
+// Change the status of tasks in dropodown menu
+export function changeDropdownStatus(overlayLayer, nodes, activeIds, renderOverlay) {
+    activeIds.forEach(id => {
+        const nodeState = nodes.find(n => n.id === id);
+        const existingDropdown = overlayLayer.querySelector(`[data-step="${id}"]`);
+
+        if (!existingDropdown || !nodeState?.foreach?.tasks) return;
+
+        const listItems = existingDropdown.querySelectorAll(".dag-task-item");
+        const isQuantitySynced = nodeState.foreach.tasks.length === listItems.length;
+
+        if (isQuantitySynced) {
+            nodeState.foreach.tasks.forEach((task, index) => {
+                listItems[index].className = `dag-task-item status-${task.status}`;
+            });
+        } else {
+            renderOverlay();
+        }
+    });
+}

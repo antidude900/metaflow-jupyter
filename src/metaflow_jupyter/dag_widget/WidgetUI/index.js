@@ -1,8 +1,8 @@
 import { getLayout, createSvgElement, getNextSteps } from "./utils.js";
-import { renderHeader } from "./components/header.js";
+import { renderHeader, changeHeaderStatus } from "./components/header.js";
 import { renderEdge, arrowHead } from "./components/edge.js";
-import { renderNode } from "./components/node.js";
-import { renderForeachDropdown } from "./components/dropdown.js";
+import { renderNode, changeNodeStatus } from "./components/node.js";
+import { renderForeachDropdown, changeDropdownStatus } from "./components/dropdown.js";
 
 function render({ model, el }) {
     // Initializing the DOM with SVG and Overlay layers
@@ -65,7 +65,7 @@ function render({ model, el }) {
         // Render the nodes
         state.nodes.forEach(node => {
             if (nodePositions[node.id]) {
-                svg.appendChild(renderNode(node, nodePositions[node.id], model, applyFocusHighlight));
+                svg.appendChild(renderNode(node, nodePositions[node.id], model, renderFocusHighlight));
             }
         });
 
@@ -78,26 +78,34 @@ function render({ model, el }) {
 
     // Render the foreach dropdown
     const renderOverlay = () => {
-        // Clear the old overlays and render fresh ones (if not, then duplicates will appear)
-        overlayLayer.innerHTML = "";
-
         // Get list of all those nodes whose dropdown is active
         const activeIds = model.get("activeDropMenus") || [];
         const nodes = model.get("nodes");
 
-        // For each of the active nodes, render the dropdown
+        // Remove those dropdowns from the DOM who are no longer active
+        overlayLayer.querySelectorAll('.dag-dropdown-container').forEach(el => {
+            const step_id = el.getAttribute('data-step');
+            if (!activeIds.includes(step_id)) {
+                el.remove();
+            }
+        });
+
+        // Add those dropdowns to the DOM who are active but not there
         activeIds.forEach(id => {
-            const node = nodes.find(n => n.id === id);
-            if (node?.foreach && nodePositions[id]) {
-                const dropdown = renderForeachDropdown(node, nodePositions[id], model);
-                overlayLayer.appendChild(dropdown);
+            const alreadyExists = overlayLayer.querySelector(`[data-step="${id}"]`);
+            if (!alreadyExists) {
+                const node = nodes.find(n => n.id === id);
+                if (node?.foreach && nodePositions?.[id]) {
+                    const dropdown = renderForeachDropdown(node, nodePositions[id], model);
+                    overlayLayer.appendChild(dropdown);
+                }
             }
         });
     };
 
 
     // Apply focus highlight to the nodes and edges when hovered
-    const applyFocusHighlight = (focusedNodeId) => {
+    const renderFocusHighlight = (focusedNodeId) => {
         const svg = svgLayer.querySelector("svg");
         if (!svg) return;
 
@@ -125,52 +133,14 @@ function render({ model, el }) {
     };
 
 
-    // Sync the items in the dropdown with the new status of the node's tasks
-    const syncDropdownStatus = () => {
-        // Get list of all those nodes whose dropdown is active
-        const activeIds = model.get("activeDropMenus") || [];
-        const nodes = model.get("nodes");
-
-        // We access each dropdown's DOM element with the custom attribute we set to it: data-step=node_id
-        activeIds.forEach(id => {
-            const nodeState = nodes.find(n => n.id === id);
-            const existingDropdown = overlayLayer.querySelector(`[data-step="${id}"]`);
-
-            if (!existingDropdown || !nodeState?.foreach?.tasks) return;
-
-            // Get all the task items of  the dropdown
-            const listItems = existingDropdown.querySelectorAll(".dag-task-item");
-
-            // Check if the tasks count in the node state is equal to task count in the dropdown
-            // The task count may change if task fetch before failed and then later was successfull
-            const isQuantitySynced = nodeState.foreach.tasks.length === listItems.length;
-
-            if (isQuantitySynced) {
-                // Update the status of each task 
-                // Simply changing the status- classname which changes its color CSS
-                nodeState.foreach.tasks.forEach((task, index) => {
-                    listItems[index].className = `dag-task-item status-${task.status}`;
-                });
-            } else {
-                // if the task count changed, trigger full overlay re-render of that node to display the new tasks
-                // else just the status change only requires changing the classname of the task item 
-                renderOverlay();
-            }
-        });
-    };
-
-
-    // Set Change Listeners to each of the given states and re-render DAG on change
-    const listenForChange = ["nodes", "edges", "flow_name", "subtitle", "executionStatus"];
-    listenForChange.forEach(key => model.on(`change:${key}`, renderDag));
-
-    // When node changes, sync the item in the dropdown with the node's status
-    model.on("change:nodes", syncDropdownStatus);
-
-    // Check for dropdown open/close actios and render the active ones
+    // Set Change Listeners 
+    const svg = () => svgLayer.querySelector("svg");
+    model.on("change:nodes", () => changeNodeStatus(svg(), model.get("nodes")));
+    model.on("change:executionStatus", () => changeHeaderStatus(svg(), model.get("executionStatus")));
+    model.on("change:nodes", () => changeDropdownStatus(overlayLayer, model.get("nodes"), model.get("activeDropMenus") || [], renderOverlay));
     model.on("change:activeDropMenus", renderOverlay);
 
-    // Intiail Render
+    // Initial Render
     renderDag();
     renderOverlay();
 }
