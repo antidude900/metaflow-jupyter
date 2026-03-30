@@ -59,10 +59,10 @@ class FlowRegistry:
                 del self.flows[flow_name]
         else:
             self.flows.clear()
-
+                
     def to_script(self, flow_name):
         """
-        Assembles the code content of all cell magics to a script file
+        Assembles the code content of all cell magics to a full script
         """
         if flow_name not in self.flows:
             raise ValueError(f"No code registered for flow: {flow_name}")
@@ -148,11 +148,7 @@ class FlowRegistry:
 
             script.append(textwrap.indent(full_body.strip(), INDENT * 2) + "\n")
 
-        # Adding entry point
-        script.extend(["if __name__ == '__main__':", f"{INDENT}{flow_name}()"])
-
-        # returing the script as a single string adding new lines in between
-        return "\n".join(script)
+        return script
 
 # Instance of the Registry for the magics to access and add code
 registry = FlowRegistry()
