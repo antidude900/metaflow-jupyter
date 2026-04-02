@@ -1,5 +1,4 @@
 import asyncio, os
-from pathlib import Path
 from metaflow import FlowSpec, NBRunner
 from metaflow.exception import MetaflowException
 from .bundle_ui import bundle_js, bundle_css
@@ -28,6 +27,7 @@ class DagWidget(anywidget.AnyWidget):
     flow_name = Unicode("").tag(sync=True)
     subtitle = Unicode("").tag(sync=True)
     executionStatus = Unicode("").tag(sync=True)
+    _sync = Unicode("").tag(sync=True)
 
     def __init__(self, flow_cls, runner=None, run=False, showLogs=True, filename=None,**kwargs):
         """
@@ -74,6 +74,8 @@ class DagWidget(anywidget.AnyWidget):
             # And record that as a active task to later cancel it manually if needed
             DagWidget._active_task = asyncio.create_task(self._run_and_track(runner, flow_cls, showLogs))
 
+        # Observe the sync traitlet (specifically for Colab sync fixes)
+        self.observe(lambda _: self.send_state(), names=["_sync"])
 
     async def _run_and_track(self, runner, flow_cls, showLogs):
         """

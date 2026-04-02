@@ -140,9 +140,22 @@ function render({ model, el }) {
     model.on("change:nodes", () => changeDropdownStatus(overlayLayer, model.get("nodes"), model.get("activeDropMenus") || [], renderOverlay));
     model.on("change:activeDropMenus", renderOverlay);
 
+    // Google Colab buffers background updates from the Python kernal
+    // So we poll every 1 second to force the buffer to flush
+    const pollInterval = setInterval(() => {
+        const status = model.get("executionStatus");
+        if (status === "Starting..." || status === "Running...") {
+            model.set("_sync", Date.now().toString());
+            model.save_changes();
+        }
+    }, 1000);
+
     // Initial Render
     renderDag();
     renderOverlay();
+
+    // Stop polling when the widget is unmounted
+    return () => clearInterval(pollInterval);
 }
 
 export default { render };
